@@ -4,8 +4,7 @@ const bodyParser = require('body-parser');
 const ejs = require('ejs');
 const mongoose = require('mongoose');
 const app = express();
-const encrypt = require('mongoose-encryption');
-const md5 = require('md5')
+const bcrypt = require('bcryptjs')
 
 
 app.use(express.static('public'));
@@ -36,17 +35,20 @@ app.get('/login', (req, res) => {
 
 app.post('/login', (req, res) => {
     const username = req.body.username
-    const password = md5(req.body.password)
-
+    const password = req.body.password
     try {
         User.findOne({email: username}).then((user) => {
-            if (user && user.password === password) {
-                res.render('secrets');
-            } else {
-                res.render('login')
-            }
-        })
-    } catch(err) {
+            bcrypt.compare(password, user.password).then((result) => {
+                if (result === true) {
+                    res.render('secrets');
+                } else {
+                    res.render('login')
+                }
+            })
+        });
+
+
+    } catch (err) {
         res.render('login');
     }
 });
@@ -59,15 +61,20 @@ app.get('/register', (req, res) => {
 
 
 app.post('/register', (req, res) => {
-    const newUser = new User({
-        email: req.body.username,
-        password: md5(req.body.password)
-    })
-    newUser.save().then(() => {
-        console.log('New user registered')
-        res.render('secrets');
-    }).catch(err => console.log(err))
-})
+
+    bcrypt.genSalt(10, function (err, salt) {
+        bcrypt.hash(req.body.password, salt, function (err, hash) {
+            const newUser = new User({
+                email: req.body.username,
+                password: hash
+            })
+            newUser.save().then(() => {
+                console.log('New user registered')
+                res.render('secrets');
+            }).catch(err => console.log(err))
+        });
+    });
+});
 
 
 app.listen(3000, () => {
